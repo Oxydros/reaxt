@@ -20,7 +20,7 @@ defmodule WebPack.Plug.Static do
 
   def wait_compilation(conn,_) do
     if Application.get_env(:reaxt,:hot) &&
-         :wait == GenEvent.call(WebPack.Events,WebPack.EventManager,{:wait?,self()}) do
+         :wait == :gen_event.call(WebPack.Events,WebPack.EventManager,{:wait?,self()}) do
       receive do :ok->:ok after 30_000->:ok end # if a compil is running, wait its end before serving asset
     end
     conn
@@ -44,7 +44,7 @@ defmodule WebPack.Plug.Static do
     hot? = Application.get_env(:reaxt,:hot)
     if hot? == :client, do: Plug.Conn.chunk(conn, "event: hot\ndata: nothing\n\n")
     if hot?, do:
-      GenEvent.add_mon_handler(WebPack.Events,{WebPack.Plug.Static.EventHandler,make_ref()},conn)
+      :gen_event.add_sup_handler(WebPack.Events,{WebPack.Plug.Static.EventHandler,make_ref()},conn)
     receive do {:gen_event_EXIT,_,_} -> halt(conn) end
   end
   get "/webpack/client.js" do
@@ -57,7 +57,6 @@ defmodule WebPack.Plug.Static do
   match _, do: conn
 
   defmodule EventHandler do
-    use GenEvent
     def handle_event(ev,conn) do #Send all builder events to browser through SSE
       Plug.Conn.chunk(conn, "event: #{ev.event}\ndata: #{Poison.encode!(ev)}\n\n")
       {:ok, conn}
@@ -66,11 +65,10 @@ defmodule WebPack.Plug.Static do
 end
 
 defmodule WebPack.EventManager do
-  use GenEvent
   require Logger
   def start_link do
-    res = GenEvent.start_link(name: WebPack.Events)
-    GenEvent.add_handler(WebPack.Events,__MODULE__,%{init: true,pending: [], compiling: false, compiled: false})
+    res = :gen_event.start_link({:local, WebPack.Events})
+    :gen_event.add_handler(WebPack.Events,__MODULE__,%{init: true,pending: [], compiling: false, compiled: false})
     receive do :server_ready-> :ok end
     res
   end
@@ -114,7 +112,7 @@ defmodule WebPack.EventManager do
   def done(state) do
     for pid<-state.pending, do: send(pid,:ok)
     if state.init, do: send(Process.whereis(Reaxt.App.Sup),:server_ready)
-    GenEvent.notify(WebPack.Events,%{event: "done"})
+    :gen_event.notify(WebPack.Events,%{event: "done"})
     %{state| pending: [], init: false, compiling: false, compiled: true}
   end
 end

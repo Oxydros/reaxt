@@ -1,5 +1,6 @@
 defmodule Mix.Tasks.Npm.Install do
   use Mix.Task
+  require Logger
 
   @shortdoc "`npm install` in web_dir + npm install server side dependencies"
   def run(_args) do
@@ -9,7 +10,9 @@ defmodule Mix.Tasks.Npm.Install do
       # TOIMPROVE - did not find a better hack to avoid `npm install`'s symlinks.
       # First we make a tar gz package, then npm installs it.
       reaxt_tgz = "#{System.tmp_dir}/reaxt.tgz"
+      Logger.debug("writing in #{reaxt_tgz}")
       System.cmd("tar", ["zcf",reaxt_tgz,"commonjs_reaxt"],into: IO.stream(:stdio, :line), cd: "#{:code.priv_dir(:reaxt)}")
+      Logger.debug("Executing npm install")
       System.cmd("npm",["install","--no-save",reaxt_tgz], into: IO.stream(:stdio, :line), cd: WebPack.Util.web_app)
     end
     :ok
