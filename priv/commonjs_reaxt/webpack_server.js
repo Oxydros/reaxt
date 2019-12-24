@@ -12,7 +12,10 @@ var client_config = require(process.cwd()+"/"+process.argv[2])
 //    // remove external which cause conflicts in hot loading
 //    client_config.externals = {}
 //}
-var client_compiler = webpack(client_config)
+var webpack_compiler = webpack(client_config)
+
+const [client_compiler, server_compiler] = webpack_compiler.compilers
+const compilerHooks = webpack_compiler.hooks
 
 var client_stats,client_err
 function maybe_done() {
@@ -21,23 +24,27 @@ function maybe_done() {
   else    port.write({event: "client_done"})
 }
 
-client_compiler.plugin("invalid", function() {
+compilerHooks.invalid.tap("reaxt", function() {
+  console.warn("[WEBPACK] Client code is invalid")
   port.write({event: "client_invalid"})
 })
-client_compiler.plugin("compile", function() { 
-  port.write({event: "client_compile"})
-})
-client_compiler.plugin("failed", function(error) {
-  client_err = error
-  maybe_done()
-})
-client_compiler.plugin("done", function(stats) {
+// compilerHooks.compile.tap("reaxt", function() { 
+//   console.warn("[WEBPACK] Client code compiling")
+//   port.write({event: "client_compile"})
+// })
+// compilerHooks.failed.tap("reaxt", function(error) {
+//   client_err = error
+//   console.error("[WEBPACK] Compilation error")
+//   maybe_done()
+// })
+compilerHooks.done.tap("reaxt", function(stats) {
   client_stats = stats
-  port.write({event: "client_hash",hash: stats.hash})
+  port.write({event: "client_hash", hash: stats.hash})
+  console.warn("[WEBPACK] Done compiling")
   require("fs").writeFile(process.cwd()+"/../priv/webpack.stats.json", JSON.stringify(stats.toJson()), maybe_done)
 })
 //port.write({event: "invalid"})
-client_compiler.watch({aggregateTimeout: 200},  function(){})
+webpack_compiler.watch({aggregateTimeout: 200},  function(){})
 server(function(req,reply_to,state,done){
   //maybe_done() // receive message indicating server compilation end
   done("noreply")

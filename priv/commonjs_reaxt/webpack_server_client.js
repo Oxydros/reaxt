@@ -12,6 +12,8 @@ if(process.argv[2] === "hot"){
     client_config.externals = {}
 }
 var client_compiler = webpack(client_config)
+const compilerHooks = client_compiler.hooks
+
 
 var client_stats,client_err
 function maybe_done() {
@@ -20,17 +22,21 @@ function maybe_done() {
   else    port.write({event: "client_done"})
 }
 
-client_compiler.plugin("invalid", function() {
+client_compiler.hooks.invalid.tap("reaxt", function() {
+  console.warn("[WEBPACK CLIENT] Client code is invalid")
   port.write({event: "client_invalid"})
 })
-client_compiler.plugin("compile", function() { 
+compilerHooks.compile.tap("reaxt", function() { 
+  console.warn("[WEBPACK CLIENT] Client code compiling")
   port.write({event: "client_compile"}) 
 })
-client_compiler.plugin("failed", function(error) {
+client_compiler.hooks.failed.tap("reaxt", function(error) {
   client_err = error
+  console.error("[WEBPACK CLIENT] Compilation error")
   maybe_done()
 })
-client_compiler.plugin("done", function(stats) {
+client_compiler.hooks.done.tap("reaxt", function(stats) {
+  console.warn("[WEBPACK CLIENT] Done compiling")
   client_stats = stats
   port.write({event: "client_hash",hash: stats.hash})
   require("fs").writeFile(process.cwd()+"/../priv/webpack.stats.json", JSON.stringify(stats.toJson()), maybe_done)

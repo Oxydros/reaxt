@@ -4,6 +4,7 @@ var webpack = require("webpack"),
 
 var client_config = require("./server.webpack.config.js")
 var client_compiler = webpack(client_config)
+const compilerHooks = client_compiler.hooks
 
 var client_stats,client_err
 function maybe_done() {
@@ -12,19 +13,24 @@ function maybe_done() {
   else    port.write({event: "server_done"})
 }
 
-client_compiler.plugin("invalid", function() {
+client_compiler.hooks.invalid.tap("reaxt", function() {
+  console.warn("[WEBPACK SERVER] Server code is invalid")
   port.write({event: "server_invalid"})
 })
-client_compiler.plugin("compile", function() { 
+compilerHooks.compile.tap("reaxt", function() { 
+  console.warn("[WEBPACK SERVER] Server code compiling")
   port.write({event: "server_compile"}) 
 })
-client_compiler.plugin("failed", function(error) {
+client_compiler.hooks.failed.tap("reaxt", function(error) {
   client_err = error
+  console.error("[WEBPACK SERVER] Server Compilation error")
   maybe_done()
 })
-client_compiler.plugin("done", function(stats) {
+client_compiler.hooks.done.tap("reaxt", function(stats) {
   client_stats = stats
   //port.write({event: "hash",hash: stats.hash})
+  console.warn("[WEBPACK SERVER] Server Done compiling")
+
   maybe_done()
   //require("fs").writeFile(process.cwd()+"/../priv/webpack.stats.json", JSON.stringify(stats.toJson()), 
   //    maybe_done)
